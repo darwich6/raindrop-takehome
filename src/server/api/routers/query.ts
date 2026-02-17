@@ -9,7 +9,7 @@ const openAIClient = new OpenAI({
 })
 
 const GRAMMAR = `
-start: "SELECT" SP select_list SP "FROM" SP "pp_completed" where_clause? group_by_clause? order_by_clause? limit_clause? ";"
+start: "SELECT" SP select_list SP "FROM" SP "pp_complete" where_clause? group_by_clause? order_by_clause? limit_clause? ";"
 
 SP: " "
 
@@ -62,7 +62,7 @@ const TOOL = {
   type: "custom" as const,
   name: "clickhouse_query",
   description:
-    "Generates read-only ClickHouse SELECT queries against the pp_completed table. " +
+    "Generates read-only ClickHouse SELECT queries against the pp_complete table. " +
     "Only SELECT statements are allowed — no INSERT, UPDATE, DELETE, DROP, ALTER, or any DDL/DML. " +
     "Results are limited to 1000 rows maximum. " +
     "Available columns: " +
@@ -101,7 +101,7 @@ export const queryRouter = createTRPCRouter({
           {
             role: "developer",
             content:
-              "You are a SQL assistant. Convert the user's natural language query into a valid ClickHouse SQL query against the pp_completed table. Call the clickhouse_query tool with the generated SQL. " +
+              "You are a SQL assistant. Convert the user's natural language query into a valid ClickHouse SQL query against the pp_complete table. Call the clickhouse_query tool with the generated SQL. " +
               "The table contains UK property price paid data with columns: price, date, postcode1, postcode2, type, is_new, duration, addr1, addr2, street, locality, town, district, county. " +
               "All town, district, county, street, and locality values are UPPERCASE. " +
               "Always include a LIMIT clause (max 1000) unless the user asks for an aggregate with no detail rows. " +
@@ -136,9 +136,11 @@ export const queryRouter = createTRPCRouter({
         format: "JSONEachRow",
       });
 
+      const rows = await result.json<Record<string, unknown>>();
+
       return {
         sql,
-        results: result.json(),
-      }
+        results: rows,
+      };
     }),
 });

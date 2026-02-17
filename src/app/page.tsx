@@ -1,53 +1,104 @@
-import Link from "next/link";
+"use client";
 
-import { LatestPost } from "~/app/_components/post";
-import { api, HydrateClient } from "~/trpc/server";
+import { useState } from "react";
+import { api } from "~/trpc/react";
 
-export default async function Home() {
-  const hello = await api.post.hello({ text: "from tRPC" });
+export default function Home() {
+  const [query, setQuery] = useState("");
 
-  void api.post.getLatest.prefetch();
+  const execute = api.query.execute.useMutation();
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!query.trim()) return;
+    execute.mutate({ query: query.trim() });
+  };
 
   return (
-    <HydrateClient>
-      <main className="flex min-h-screen flex-col items-center justify-center bg-gradient-to-b from-[#2e026d] to-[#15162c] text-white">
-        <div className="container flex flex-col items-center justify-center gap-12 px-4 py-16">
-          <h1 className="text-5xl font-extrabold tracking-tight sm:text-[5rem]">
-            Create <span className="text-[hsl(280,100%,70%)]">T3</span> App
-          </h1>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:gap-8">
-            <Link
-              className="flex max-w-xs flex-col gap-4 rounded-xl bg-white/10 p-4 hover:bg-white/20"
-              href="https://create.t3.gg/en/usage/first-steps"
-              target="_blank"
-            >
-              <h3 className="text-2xl font-bold">First Steps →</h3>
-              <div className="text-lg">
-                Just the basics - Everything you need to know to set up your
-                database and authentication.
-              </div>
-            </Link>
-            <Link
-              className="flex max-w-xs flex-col gap-4 rounded-xl bg-white/10 p-4 hover:bg-white/20"
-              href="https://create.t3.gg/en/introduction"
-              target="_blank"
-            >
-              <h3 className="text-2xl font-bold">Documentation →</h3>
-              <div className="text-lg">
-                Learn more about Create T3 App, the libraries it uses, and how
-                to deploy it.
-              </div>
-            </Link>
-          </div>
-          <div className="flex flex-col items-center gap-2">
-            <p className="text-2xl text-white">
-              {hello ? hello.greeting : "Loading tRPC query..."}
-            </p>
-          </div>
+    <main className="min-h-screen bg-zinc-950 p-8 text-white">
+      <div className="mx-auto max-w-4xl space-y-6">
+        <h1 className="text-3xl font-bold">UK Property Price Query</h1>
+        <p className="text-zinc-400">
+          Ask a question about UK property prices in plain English.
+        </p>
 
-          <LatestPost />
-        </div>
-      </main>
-    </HydrateClient>
+        <form onSubmit={handleSubmit} className="flex gap-3">
+          <input
+            type="text"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="e.g. What is the average price in London?"
+            className="flex-1 rounded-lg border border-zinc-700 bg-zinc-900 px-4 py-3 text-white placeholder-zinc-500 outline-none focus:border-zinc-500"
+          />
+          <button
+            type="submit"
+            disabled={execute.isPending}
+            className="rounded-lg bg-white px-6 py-3 font-medium text-black hover:bg-zinc-200 disabled:opacity-50"
+          >
+            {execute.isPending ? "Running..." : "Query"}
+          </button>
+        </form>
+
+        {execute.error && (
+          <div className="rounded-lg border border-red-800 bg-red-950 p-4 text-red-300">
+            {execute.error.message}
+          </div>
+        )}
+
+        {execute.data && (
+          <div className="space-y-4">
+            <div>
+              <h2 className="mb-2 text-sm font-medium text-zinc-400">
+                Generated SQL
+              </h2>
+              <pre className="overflow-x-auto rounded-lg bg-zinc-900 p-4 text-sm text-green-400">
+                {execute.data.sql}
+              </pre>
+            </div>
+
+            <div>
+              <h2 className="mb-2 text-sm font-medium text-zinc-400">
+                Results ({execute.data.results.length} rows)
+              </h2>
+              {execute.data.results.length > 0 ? (
+                <div className="overflow-x-auto rounded-lg border border-zinc-800">
+                  <table className="w-full text-left text-sm">
+                    <thead className="border-b border-zinc-800 bg-zinc-900">
+                      <tr>
+                        {Object.keys(
+                          execute.data.results[0] as Record<string, unknown>,
+                        ).map((col) => (
+                          <th
+                            key={col}
+                            className="px-4 py-2 font-medium text-zinc-300"
+                          >
+                            {col}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {execute.data.results.map((row, i) => (
+                        <tr key={i} className="border-b border-zinc-800/50">
+                          {Object.values(
+                            row as Record<string, unknown>,
+                          ).map((val, j) => (
+                            <td key={j} className="px-4 py-2 text-zinc-300">
+                              {String(val)}
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <p className="text-zinc-500">No results returned.</p>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    </main>
   );
 }
