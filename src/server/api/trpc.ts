@@ -10,6 +10,8 @@ import { initTRPC } from "@trpc/server";
 import superjson from "superjson";
 import { ZodError } from "zod";
 
+import { createClickHouseClient } from "~/server/db/clickhouse";
+
 /**
  * 1. CONTEXT
  *
@@ -23,8 +25,11 @@ import { ZodError } from "zod";
  * @see https://trpc.io/docs/server/context
  */
 export const createTRPCContext = async (opts: { headers: Headers }) => {
+  const clickhouse = createClickHouseClient();
+
   return {
     ...opts,
+    clickhouse,
   };
 };
 

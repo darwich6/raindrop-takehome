@@ -8,6 +8,10 @@ export const env = createEnv({
    */
   server: {
     NODE_ENV: z.enum(["development", "test", "production"]),
+    CLICKHOUSE_URL: z.string(),
+    CLICKHOUSE_USER: z.string(),
+    CLICKHOUSE_PASSWORD: z.string(),
+    OPENAI_API_KEY: z.string(),
   },
 
   /**
@@ -25,6 +29,10 @@ export const env = createEnv({
    */
   runtimeEnv: {
     NODE_ENV: process.env.NODE_ENV,
+    CLICKHOUSE_URL: process.env.CLICKHOUSE_URL,
+    CLICKHOUSE_USER: process.env.CLICKHOUSE_USER,
+    CLICKHOUSE_PASSWORD: process.env.CLICKHOUSE_PASSWORD,
+    OPENAI_API_KEY: process.env.OPENAI_API_KEY,
     // NEXT_PUBLIC_CLIENTVAR: process.env.NEXT_PUBLIC_CLIENTVAR,
   },
   /**
