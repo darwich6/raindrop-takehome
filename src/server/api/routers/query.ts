@@ -6,9 +6,9 @@ import { TRPCError } from "@trpc/server";
 
 const openAIClient = new OpenAI({
   apiKey: env.OPENAI_API_KEY,
-})
+});
 
-const GRAMMAR = `
+export const GRAMMAR = `
 start: "SELECT" SP select_list SP "FROM" SP "pp_complete" where_clause? group_by_clause? order_by_clause? limit_clause? ";"
 
 SP: " "
@@ -37,7 +37,7 @@ comp_op: "=" | "!=" | ">" | "<" | ">=" | "<="
 
 value: STRING | NUMBER
 
-STRING: /'[A-Za-z0-9 \-]{1,50}'/
+STRING: /'[A-Za-z0-9 \\-]{1,50}'/
 
 NUMBER: /[0-9]{1,10}/
 
@@ -89,47 +89,51 @@ const TOOL = {
   },
 };
 
+export async function generateSQL(query: string): Promise<string> {
+  const resp = await openAIClient.responses.create({
+    model: "gpt-5",
+    input: [
+      {
+        role: "developer",
+        content:
+          "You are a SQL assistant. Convert the user's natural language query into a valid ClickHouse SQL query against the pp_complete table. Call the clickhouse_query tool with the generated SQL. " +
+          "The table contains UK property price paid data with columns: price, date, postcode1, postcode2, type, is_new, duration, addr1, addr2, street, locality, town, district, county. " +
+          "All town, district, county, street, and locality values are UPPERCASE. " +
+          "Always include a LIMIT clause (max 1000) unless the user asks for an aggregate with no detail rows. " +
+          "You MUST reason heavily about the query and make sure it obeys the grammar.",
+      },
+      {
+        role: "user",
+        content: query,
+      },
+    ],
+    tools: [TOOL],
+    parallel_tool_calls: false,
+    text: { format: { type: "text" } },
+  });
+
+  const toolCall = resp.output.find(
+    (item) => item.type === "custom_tool_call"
+  );
+
+  if (!toolCall || toolCall.type !== "custom_tool_call") {
+    throw new Error("Model did not generate a SQL query with custom tool call");
+  }
+
+  const sql = toolCall.input;
+  if (!sql?.trim().toUpperCase().startsWith("SELECT")) {
+    throw new Error("Only SELECT queries are allowed");
+  }
+
+  return sql;
+}
+
 export const queryRouter = createTRPCRouter({
   execute: publicProcedure
     .input(z.object({
       query: z.string(),
     })).mutation(async ({ input, ctx }) => {
-    
-      const resp = await openAIClient.responses.create({
-        model: "gpt-5",
-        input: [
-          {
-            role: "developer",
-            content:
-              "You are a SQL assistant. Convert the user's natural language query into a valid ClickHouse SQL query against the pp_complete table. Call the clickhouse_query tool with the generated SQL. " +
-              "The table contains UK property price paid data with columns: price, date, postcode1, postcode2, type, is_new, duration, addr1, addr2, street, locality, town, district, county. " +
-              "All town, district, county, street, and locality values are UPPERCASE. " +
-              "Always include a LIMIT clause (max 1000) unless the user asks for an aggregate with no detail rows. " +
-              "You MUST reason heavily about the query and make sure it obeys the grammar.",
-          },
-          {
-            role: "user",
-            content: input.query,
-          },
-        ],
-        tools: [TOOL],
-        parallel_tool_calls: false,
-        text: { format: { type: "text" } },
-      });
-
-      // extract tool call
-      const toolCall = resp.output.find(
-        (item) => item.type === "custom_tool_call"
-      );
-
-      if (!toolCall || toolCall.type !== "custom_tool_call") {
-        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Model did not generate a SQL query with custom tool call" });
-      }
-
-      const sql = toolCall.input;
-      if (!sql?.trim().toUpperCase().startsWith("SELECT")) {
-        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Only SELECT queries are allowed" });
-      }
+      const sql = await generateSQL(input.query);
 
       const result = await ctx.clickhouse.query({
         query: sql,

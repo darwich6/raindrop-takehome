@@ -1,3 +1,4 @@
+import { evalRouter } from "~/server/api/routers/eval";
 import { queryRouter } from "~/server/api/routers/query";
 import { createCallerFactory, createTRPCRouter } from "~/server/api/trpc";
 
@@ -8,6 +9,7 @@ import { createCallerFactory, createTRPCRouter } from "~/server/api/trpc";
  */
 export const appRouter = createTRPCRouter({
   query: queryRouter,
+  eval: evalRouter,
 });
 
 // export type definition of API
