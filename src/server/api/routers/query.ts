@@ -1,3 +1,4 @@
+import { createHash } from "crypto";
 import { z } from "zod";
 import OpenAI from "openai";
 import { createTRPCRouter, publicProcedure } from "~/server/api/trpc";
@@ -89,7 +90,19 @@ const TOOL = {
   },
 };
 
+const CACHE_TTL_MS = 2 * 60 * 1000; // 2 minutes
+const sqlCache = new Map<string, { sql: string; expiresAt: number }>();
+
+function cacheKey(query: string): string {
+  const normalized = query.trim().toLowerCase().replace(/[\s\p{P}]/gu, "");
+  return createHash("sha256").update(normalized).digest("hex");
+}
+
 export async function generateSQL(query: string): Promise<string> {
+  const key = cacheKey(query);
+  const cached = sqlCache.get(key);
+  if (cached && cached.expiresAt > Date.now()) return cached.sql;
+
   const resp = await openAIClient.responses.create({
     model: "gpt-5",
     input: [
@@ -125,6 +138,7 @@ export async function generateSQL(query: string): Promise<string> {
     throw new Error("Only SELECT queries are allowed");
   }
 
+  sqlCache.set(key, { sql, expiresAt: Date.now() + CACHE_TTL_MS });
   return sql;
 }
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type SubmitEvent } from "react";
 import Link from "next/link";
 import { api } from "~/trpc/react";
 
@@ -10,7 +10,7 @@ export default function Home() {
 
   const [copied, setCopied] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = (e: SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!query.trim()) return;
     execute.mutate({ query: query.trim() });
@@ -80,7 +80,6 @@ export default function Home() {
         {/* Results */}
         {execute.data && (
           <div className="space-y-6">
-            {/* SQL */}
             <div>
               <div className="mb-2 flex items-center justify-between">
                 <p className="text-xs font-medium uppercase tracking-widest text-zinc-500">
@@ -98,7 +97,6 @@ export default function Home() {
               </pre>
             </div>
 
-            {/* Table */}
             <div>
               <p className="mb-2 text-xs font-medium uppercase tracking-widest text-zinc-500">
                 Results

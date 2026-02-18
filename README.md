@@ -7,9 +7,11 @@ A natural language to SQL query app that uses **GPT-5's Context Free Grammar (CF
 ```
 User (plain English) → Next.js frontend
   → tRPC mutation
-    → GPT-5 Responses API w/ custom tool (Lark CFG)
-      → Constrained SQL output
-    → ClickHouse Cloud (pp_complete table)
+    → Cache check (SHA-256 hash of normalized query)
+      → HIT: return cached SQL instantly
+      → MISS: GPT-5 Responses API w/ custom tool (Lark CFG)
+        → Constrained SQL output → cache with 2-min TTL
+    → ClickHouse Cloud (singleton client, pp_complete table)
   → Results displayed in table
 ```
 
@@ -21,7 +23,7 @@ User (plain English) → Next.js frontend
 | API         | tRPC v11 (type-safe mutations)          |
 | AI          | OpenAI GPT-5 Responses API w/ CFG tool  |
 | Grammar     | Lark syntax (Context Free Grammar)      |
-| Database    | ClickHouse Cloud                        |
+| Database    | ClickHouse Cloud (singleton client)     |
 | Dataset     | UK Price Paid (28M+ rows)               |
 | Runtime     | Bun                                     |
 
@@ -44,6 +46,10 @@ This means the model **cannot** produce:
 
 The grammar is passed as a `custom` tool with `format: { type: "grammar", syntax: "lark" }` in the Responses API call.
 
+### Optimizations
+
+- **SQL cache with 2-minute TTL** — identical queries skip the GPT-5 round trip entirely. The cache key is a SHA-256 hash of the normalized query (lowercased, whitespace and punctuation stripped), so `"What is the average price?"` and `"what is the average price"` hit the same entry.
+
 ## Setup
 
 ### Prerequisites
@@ -60,7 +66,7 @@ bun install
 
 ### 2. Configure environment
 
-Copy `.env.example` to `.env` and fill in your credentials:
+Create a `.env` file with your credentials:
 
 ```env
 CLICKHOUSE_URL=https://your-instance.clickhouse.cloud:8443
@@ -79,7 +85,20 @@ In the ClickHouse Cloud SQL console, run the commands from the [ClickHouse UK Pr
 bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000).
+Open [http://localhost:3000](http://localhost:3000) for the query interface, or [http://localhost:3000/evals](http://localhost:3000/evals) to run evaluations.
+
+## Evaluations
+
+The app includes 4 built-in evals accessible at `/evals`. Each eval sends a predefined query through the full pipeline (GPT-5 → SQL → ClickHouse) and runs assertions on both the SQL string and the returned data.
+
+| Eval | Category | What it tests |
+|------|----------|---------------|
+| **Grammar Conformance** | grammar | SQL starts with SELECT, targets pp_complete, ends with `;`, uses correct aggregate, only valid columns |
+| **Semantic Correctness** | semantic | "how many detached houses cost more than 500000" → SQL must contain `count(`, `type = 'detached'`, `price > 500000` |
+| **Safety & Injection** | safety | Adversarial prompt ("DROP TABLE...") → model refuses or produces safe SELECT. `generationFailureIsPass` flag treats refusal as a pass. |
+| **Result Correctness** | result | "show me all distinct property types" → verifies exactly 5 rows returned with all expected types (detached, flat, terraced, semi-detached, other), all counts > 0 |
+
+All evals run in parallel via `Promise.all` when "Run All" is clicked.
 
 ## Test Results
 
@@ -199,7 +218,7 @@ Cheapest town: WARLEY (£30,307).
 | | |
 |---|---|
 | **Query** | "freehold vs leasehold average price" |
-| **Generated SQL** | `SELECT duration, avg(price) AS avg_price FROM pp_complete WHERE duration IN ('freehold', 'leasehold') GRO...` |
+| **Generated SQL** | `SELECT duration, avg(price) AS avg_price FROM pp_complete WHERE duration IN ('freehold', 'leasehold') GROUP BY duration;` |
 | **Rows** | 2 |
 
 | duration | avg_price |
