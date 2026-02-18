@@ -86,7 +86,7 @@ export default function Home() {
                   Generated SQL
                 </p>
                 <button
-                  onClick={() => handleCopy(execute.data!.sql)}
+                  onClick={() => handleCopy(execute.data.sql)}
                   className="text-xs text-zinc-500 transition-colors hover:text-zinc-300"
                 >
                   {copied ? "Copied!" : "Copy"}
@@ -112,7 +112,7 @@ export default function Home() {
                     <thead>
                       <tr className="border-b border-zinc-800 bg-zinc-900/80">
                         {Object.keys(
-                          execute.data.results[0] as Record<string, unknown>,
+                          execute.data.results[0]!,
                         ).map((col) => (
                           <th
                             key={col}
@@ -129,9 +129,7 @@ export default function Home() {
                           key={i}
                           className="transition-colors hover:bg-zinc-900/50"
                         >
-                          {Object.values(
-                            row as Record<string, unknown>,
-                          ).map((val, j) => (
+                          {Object.values(row).map((val, j) => (
                             <td
                               key={j}
                               className="px-4 py-2.5 font-mono text-sm text-zinc-300"

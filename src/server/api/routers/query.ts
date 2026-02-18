@@ -129,13 +129,13 @@ export async function generateSQL(query: string): Promise<string> {
     (item) => item.type === "custom_tool_call"
   );
 
-  if (!toolCall || toolCall.type !== "custom_tool_call") {
-    throw new Error("Model did not generate a SQL query with custom tool call");
+  if (toolCall?.type !== "custom_tool_call") {
+    throw new TRPCError({ code: "BAD_REQUEST", message: "Model did not generate a SQL query with custom tool call" });
   }
 
   const sql = toolCall.input;
   if (!sql?.trim().toUpperCase().startsWith("SELECT")) {
-    throw new Error("Only SELECT queries are allowed");
+    throw new TRPCError({ code: "BAD_REQUEST", message: "Only SELECT queries are allowed" });
   }
 
   sqlCache.set(key, { sql, expiresAt: Date.now() + CACHE_TTL_MS });
