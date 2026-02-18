@@ -211,8 +211,6 @@ Cheapest town: WARLEY (£30,307).
 | **Rows** | 1 |
 | **Result** | 46,687 |
 
-> **Note:** The SQL is valid and grammar-conforming, but the top result returned **blank** postcode1/postcode2 fields — rows in the dataset with missing postcode data. The model had no way to know it should filter out empty values (`WHERE postcode1 != ''`), since that's a data-quality concern not captured by the grammar or prompt. This is a limitation of pure CFG-based constraining — it guarantees syntactic correctness, not semantic completeness.
-
 ### Test 11 — IN clause with enum comparison
 
 | | |
@@ -234,13 +232,3 @@ Cheapest town: WARLEY (£30,307).
 | **Generated SQL** | `SELECT street, avg(price) AS avg_price FROM pp_complete GROUP BY street ORDER BY avg_price DESC LIMIT 1;` |
 | **Rows** | 1 |
 | **Result** | BRAHAM STREET — £421,364,142 |
-
-## Key Observations
-
-- **12/12 queries produced valid, executable SQL** — the CFG ensures syntactic correctness at the token level.
-- **11/12 queries returned semantically useful results.** Test 10 returned blank postcode fields due to missing data — the grammar guarantees valid syntax but cannot encode data-quality filters.
-- The model correctly maps natural language concepts to SQL constructs: "most expensive" → `ORDER BY ... DESC LIMIT 1`, "how many" → `count(*)`, "per year" → `toYear(date) GROUP BY`.
-- Town/county values are correctly uppercased (`'MANCHESTER'`, `'LONDON'`, `'BIRMINGHAM'`) because the tool description specifies the data convention.
-- The model handles typos in user input gracefully (e.g. "briminghma" → `'BIRMINGHAM'`, "chepeast" → `ORDER BY ... ASC`).
-- The grammar prevents any destructive operations — only `SELECT ... FROM pp_complete` is possible.
-- Complex queries with multiple filters, IN clauses, GROUP BY + ORDER BY + LIMIT all work correctly.
